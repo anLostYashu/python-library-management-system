@@ -2,6 +2,7 @@ import json
 import uuid
 from datetime import datetime
 
+# Read data from json into a list
 with open("users.json", "r") as usersJson:
     users = json.load(usersJson)
 
@@ -11,9 +12,15 @@ with open("books.json", "r") as booksJson:
 with open("librarians.json", "r") as librariansJson:
     libs = json.load(librariansJson)
 
+
+# convert lists to dictionaries for fast searching
+booksDict = {book["bookId"]: book for book in books}
+usersDict = {user["username"]: user for user in users}
+libsDict = {lib["username"]: lib for lib in libs}
+
 def updateBooks():
     with open("books.json", "w") as booksJson:
-        json.dump(books, booksJson, indent=4)
+        json.dump(list(booksDict.values()), booksJson, indent=4)
 
 class User:
     borrowLimit = 1
@@ -26,18 +33,9 @@ class User:
     
     def updateData(self):
         with open("users.json", "w") as usersJson:
-            json.dump(users, usersJson, indent=4)
+            json.dump(list(usersDict.values()), usersJson, indent=4)
 
     def displayBook(self, book):
-        # {
-        #     "bookName": "The Catcher in the Rye",
-        #     "bookAuthor": "J.D. Salinger",
-        #     "rackNumber": 9,
-        #     "availability": true,
-        #     "bookCount": 2,
-        #     "borrowers": []
-        # }
-
         print("\n----- Book Data -----")
         print("book ID:", book["bookId"])
         print("book name:", book["bookName"])
@@ -58,7 +56,7 @@ class User:
             elif choice == 1: # Search by Title
                 bookName = input("enter book name: ")
 
-                for book in books:
+                for book in booksDict.values():
                     if book["bookName"].title() == bookName.title():
                         self.displayBook(book)
                         break
@@ -69,7 +67,7 @@ class User:
                 authorName = input("enter author name: ")
                 booksFound = False
 
-                for book in books:
+                for book in booksDict.values():
                     if book["bookAuthor"].lower() == authorName.lower():
                         self.displayBook(book)
                         booksFound = True
@@ -81,7 +79,7 @@ class User:
                 rackNumber = int(input("enter rack number to search: "))
                 booksFound = False
 
-                for book in books:
+                for book in booksDict.values():
                     if book["rackNumber"] == rackNumber:
                         self.displayBook(book)
                         booksFound = True
@@ -92,7 +90,7 @@ class User:
             elif choice == 4:
                 booksFound = False
 
-                for book in books:
+                for book in booksDict.values():
                     if book["availability"]:
                         self.displayBook(book)
                         booksFound = True
@@ -110,36 +108,39 @@ class User:
 
         bookId = input("enter book ID of the book you want to borrow: ")
 
-        for book in books:
-            if book["bookId"] == bookId:
-                if not(book["availability"]):
-                    print("book is not available. try another one...\n")
-                    return
-                
-                # EDITING BOOKS OBJECT
-                book["bookCount"] -= 1
-                book["borrowers"].append(self.user["userId"])
-                
-                if book["bookCount"] == 0:
-                    book["designatedRackNumber"] = book["rackNumber"]
-                    book["rackNumber"] = None
-                    book["availability"] = False
+        book = booksDict.get(bookId)
 
-                # EDITING USER OBJECT
-                self.user["borrowedBooks"].append({
-                    'transactionId': str(uuid.uuid4()),
-                    'bookId': book["bookId"],
-                    'borrowedDate': datetime.today().strftime("%Y-%m-%d"),
-                    'returnedDate': None
-                })
-                self.user["currentlyBorrowedBook"] += 1
-
-                print("Successfully borrowed", book["bookName"], "by", book["bookAuthor"] + "...\n")
-                return
-                    
-        else:
-            print("book not found... check the book ID...\n") 
+        if not book:
+            print("book not found... check the book ID...\n")
             return
+
+        if self.user["userId"] in book["borrowers"]:
+            print("you can't borrow the same book twice...\n")
+            return
+        
+        if not book["availability"]:
+            print("book is not available. try another one...\n")
+            return
+        
+        # EDITING BOOKS OBJECT
+        book["bookCount"] -= 1
+        book["borrowers"].append(self.user["userId"])
+        
+        if book["bookCount"] == 0:
+            book["designatedRackNumber"] = book["rackNumber"]
+            book["rackNumber"] = None
+            book["availability"] = False
+
+        # EDITING USER OBJECT
+        self.user["borrowedBooks"].append({
+            'transactionId': str(uuid.uuid4()),
+            'bookId': book["bookId"],
+            'borrowedDate': datetime.today().strftime("%Y-%m-%d"),
+            'returnedDate': None
+        })
+        self.user["currentlyBorrowedBook"] += 1
+
+        print("Successfully borrowed", book["bookName"], "by", book["bookAuthor"] + "...\n")
 
     def returnBook(self):
         if self.user["currentlyBorrowedBook"] == 0:
@@ -147,55 +148,43 @@ class User:
             return
         
         bookId = input("enter book ID of the book you want to return: ")
+        transactionsDict = {(transaction["bookId"], transaction["returnedDate"]): transaction for transaction in self.user["borrowedBooks"]}
 
-        for transaction in self.user["borrowedBooks"]:
-            if transaction["bookId"] == bookId:
-                break
-        else:
-            print("book ID does not match your currently borrowed book's ID...\n")
+        if (bookId, None) not in transactionsDict:
+            print("book ID does not match your currently borrowed book(s) ID...\n")
             return
-
-        # if self.user["borrowedBooks"][-1] != bookId:
-        #     print("book ID does not match your currently borrowed book's ID...\n")
-        #     return
+        
+        transaction = transactionsDict.get((bookId, None))
         
         dateFormat = "%Y-%m-%d"
         dateToday = datetime.today().strftime(dateFormat)
 
-        for transaction in self.user["borrowedBooks"]:
-            if transaction["bookId"] == bookId and transaction["returnedDate"] is None:
-                dateBorrowed = transaction["borrowedDate"]
-                break
-
+        dateBorrowed = transaction["borrowedDate"]
         dateDifference = datetime.strptime(dateToday, dateFormat) - datetime.strptime(dateBorrowed, dateFormat)
 
         if dateDifference.days <= 3:
             print("You can only return a book after 3 days...\n")
             return
+
+        book = booksDict.get(bookId)
+        if not book:
+            print("ERROR: BOOK NOT FOUND.\n")
+            return
         
-        for book in books:
-            if book["bookId"] == bookId:
-                # EDITING BOOKS
-                book["bookCount"] += 1
-                book["borrowers"].remove(self.user["userId"])
+        # EDITING BOOKS
+        book["bookCount"] += 1
+        book["borrowers"].remove(self.user["userId"])
 
-                if book["bookCount"] == 1:
-                    book["rackNumber"] = book["designatedRackNumber"]
-                    book.pop("designatedRackNumber")
-                    book["availability"] = True
-                
-                # EDITING USERS
-                self.user["currentlyBorrowedBook"] -= 1
-                for transaction in self.user["borrowedBooks"]:
-                    if transaction["bookId"] == bookId:
-                        transaction["returnedDate"] = datetime.today().strftime(dateFormat)
-                        break
+        if book["bookCount"] == 1:
+            book["rackNumber"] = book["designatedRackNumber"]
+            book.pop("designatedRackNumber")
+            book["availability"] = True
+        
+        # EDITING USERS
+        self.user["currentlyBorrowedBook"] -= 1
+        transaction["returnedDate"] = datetime.today().strftime(dateFormat)
 
-                print("Successfully returned", book["bookName"], "by", book["bookAuthor"] + "...\n")
-                return
-        else:
-            print("ERROR: BOOK NOT FOUND")
-
+        print("Successfully returned", book["bookName"], "by", book["bookAuthor"] + "...\n")
 
     def serveUser(self):
         while True:
@@ -226,7 +215,7 @@ class Librarian(User):
 
     def updateData(self):
         with open("librarians.json", "w") as librariansJson:
-            json.dump(libs, librariansJson, indent=4)
+            json.dump(list(libsDict.values()), librariansJson, indent=4)
 
     # ADD ADDITIONAL LIBRARIAN ONLY METHODS
 
@@ -240,55 +229,55 @@ while True:
     elif choice == 1:
         username = input("enter your username: ")
 
-        for user in users:
-            if user["username"] == username:
-                password = input("enter your password: ")
-                if user["password"] != password:
-                    print("incorrect password...\n")
-                    break
+        if username in usersDict:
+            user = usersDict.get(username)
+            password = input("enter your password: ")
 
-                client = User(user)
-                client.serveUser()
-                exit(0)
+            if password != user["password"]:
+                print("incorrect password...\n")
+                continue
+
+            client = User(user)
+            client.serveUser()
+            exit(0)
+            
+        elif username in libsDict:
+            user = libsDict.get(username)
+            password = input("enter your password: ")
+
+            if password != user["password"]:
+                print("incorrect password...\n")
+                continue
+
+            client = Librarian(user)
+            client.serveUser()
+            exit(0)
+
         else:
-            for lib in libs:
-                if lib["username"] == username:
-                    password = input("enter your librarian password: ")
-
-                    if lib["password"] != password:
-                        print("invalid librarian password...\n")
-                        break
-
-                    client = Librarian(lib)
-                    client.serveUser()
-                    exit(0)
-            else:
-                print("user not found...\n")
+            print("User not found...\n")
 
     elif choice == 2:
         username = input("enter username: ")
 
-        for user in users:
-            if user["username"] == username:
-                print("user already exists.\n")
-                break
-        else:
-            password = input("create a password: ")
+        if username in usersDict:
+            print("User already exists...\n")
+            continue
 
-            newUser = {
-                "userId": str(uuid.uuid4()),
-                "username": username,
-                "password": password,
-                "borrowedBooks": [],
-                "currentlyBorrowedBook": 0,
-            }
+        password = input("create a password: ")
+        newUser = {
+            "userId": str(uuid.uuid4()),
+            "username": username,
+            "password": password,
+            "borrowedBooks": [],
+            "currentlyBorrowedBook": 0,
+        }
 
-            users.append(newUser)
+        usersDict["username"] = newUser
 
-            # REGISTERED
-            user = User(newUser)
-            user.serveUser()
+        #Registered
+        client = User(newUser)
+        client.serveUser()
+        exit(0)
 
-            exit(0)
     else:
         print("invalid choice...\n")

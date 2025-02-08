@@ -3,14 +3,7 @@
         "userId": "244a4757-03c2-44a6-8b58-7d3b18a97337",
         "username": "yashu",
         "password": "abc",
-        "borrowedBooks": [
-            {
-                "transactionId": "aa0fd1e3-ef50-4eb3-9d85-50f4c27837ab",
-                "bookId": "JJZ13M",
-                "borrowedDate": "2025-02-01",
-                "returnedDate": "2025-02-08"
-            }
-        ],
+        "borrowedBooks": [],
         "currentlyBorrowedBook": 0
     }
 ]
