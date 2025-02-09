@@ -1,6 +1,7 @@
 import json
 import uuid
 from datetime import datetime
+from abc import ABC, abstractmethod
 
 # Read data from json into a list
 with open("users.json", "r") as usersJson:
@@ -22,20 +23,20 @@ def updateBooks():
     with open("books.json", "w") as booksJson:
         json.dump(list(booksDict.values()), booksJson, indent=4)
 
-class User:
-    borrowLimit = 1
+class User(ABC):
+    _borrowLimit = None
 
     def __init__(self, user):
         self.user = user
 
     def __str__(self):
         return f'userId: {self.user["userId"]}, username: {self.user["username"]}, pass: {self.user["password"]}.'
-    
-    def updateData(self):
+
+    def _updateUser(self):
         with open("users.json", "w") as usersJson:
             json.dump(list(usersDict.values()), usersJson, indent=4)
 
-    def displayBook(self, book):
+    def __displayBook(self, book):
         print("\n----- Book Data -----")
         print("book ID:", book["bookId"])
         print("book name:", book["bookName"])
@@ -45,7 +46,7 @@ class User:
         print("book count:", str(book["bookCount"]))
         print("---------------------\n")
     
-    def searchBook(self):
+    def _searchBook(self):
         while True:
             print("------------------------------")
             choice = int(input("How would you like to seach the book?\n\t1. by name\n\t2. by author\n\t3. by rack number\n\t4. by availability\n\t0. return\n----> "))
@@ -58,7 +59,7 @@ class User:
 
                 for book in booksDict.values():
                     if book["bookName"].title() == bookName.title():
-                        self.displayBook(book)
+                        self.__displayBook(book)
                         break
                 else:
                     print("book with name", bookName, "was not found...\n")
@@ -69,7 +70,7 @@ class User:
 
                 for book in booksDict.values():
                     if book["bookAuthor"].lower() == authorName.lower():
-                        self.displayBook(book)
+                        self.__displayBook(book)
                         booksFound = True
                 
                 if not(booksFound):
@@ -81,7 +82,7 @@ class User:
 
                 for book in booksDict.values():
                     if book["rackNumber"] == rackNumber:
-                        self.displayBook(book)
+                        self.__displayBook(book)
                         booksFound = True
 
                 if not(booksFound):
@@ -92,7 +93,7 @@ class User:
 
                 for book in booksDict.values():
                     if book["availability"]:
-                        self.displayBook(book)
+                        self.__displayBook(book)
                         booksFound = True
 
                 if not(booksFound):
@@ -101,9 +102,9 @@ class User:
             else:
                 print("invalid choice...\n")
     
-    def borrowBook(self):
-        if self.user["currentlyBorrowedBook"] == self.borrowLimit:
-            print(f'you can not borrow more than {self.borrowLimit} book at a time...\nf')
+    def _borrowBook(self):
+        if self.user["currentlyBorrowedBook"] == self._borrowLimit:
+            print(f'you can not borrow more than {self._borrowLimit} book at a time...\nf')
             return
 
         bookId = input("enter book ID of the book you want to borrow: ")
@@ -135,6 +136,7 @@ class User:
         self.user["borrowedBooks"].append({
             'transactionId': str(uuid.uuid4()),
             'bookId': book["bookId"],
+            'bookName': book["bookName"],
             'borrowedDate': datetime.today().strftime("%Y-%m-%d"),
             'returnedDate': None
         })
@@ -142,7 +144,7 @@ class User:
 
         print("Successfully borrowed", book["bookName"], "by", book["bookAuthor"] + "...\n")
 
-    def returnBook(self):
+    def _returnBook(self):
         if self.user["currentlyBorrowedBook"] == 0:
             print("You haven't borrowed any book to return...\n")
             return
@@ -159,14 +161,14 @@ class User:
         dateFormat = "%Y-%m-%d"
         # UN/COMMENT THIS FOR THE 3 DAYS MINIMUM TIME LIMIT #
 
-        dateToday = datetime.today().strftime(dateFormat)
+        # dateToday = datetime.today().strftime(dateFormat)
 
-        dateBorrowed = transaction["borrowedDate"]
-        dateDifference = datetime.strptime(dateToday, dateFormat) - datetime.strptime(dateBorrowed, dateFormat)
+        # dateBorrowed = transaction["borrowedDate"]
+        # dateDifference = datetime.strptime(dateToday, dateFormat) - datetime.strptime(dateBorrowed, dateFormat)
 
-        if dateDifference.days <= 3:
-            print("You can only return a book after 3 days...\n")
-            return
+        # if dateDifference.days <= 3:
+        #     print("You can only return a book after 3 days...\n")
+        #     return
 
         book = booksDict.get(bookId)
         if not book:
@@ -188,6 +190,15 @@ class User:
 
         print("Successfully returned", book["bookName"], "by", book["bookAuthor"] + "...\n")
 
+    @abstractmethod
+    def serveUser():
+        pass
+
+class Client(User):
+    def __init__(self, user):
+        self.user = user
+        self._borrowLimit = 1
+
     def serveUser(self):
         while True:
             print("------------------------------")
@@ -196,30 +207,54 @@ class User:
             match choice:
                 case 0:
                     updateBooks()
-                    self.updateData()
+                    self._updateUser()
                     print("logged out...")
                     return
 
                 case 1:
-                    self.searchBook()
+                    self._searchBook()
 
                 case 2:
-                    self.borrowBook()
+                    self._borrowBook()
 
                 case 3:
-                    self.returnBook()
+                    self._returnBook()
 
                 case _:
                     print("invalid choice...\n")
 
 class Librarian(User):
-    borrowLimit = 3
+    def __init__(self, user):
+        self.user = user
+        self._borrowLimit = 3
 
-    def updateData(self):
+    def _updateUser(self):
         with open("librarians.json", "w") as librariansJson:
             json.dump(list(libsDict.values()), librariansJson, indent=4)
 
-    # ADD ADDITIONAL LIBRARIAN ONLY METHODS
+    def serveUser(self):
+        while True:
+            print("------------------------------")
+            choice = int(input("L: what would you like to do?\n\t1. search book\n\t2. borrow book\n\t3. return book\n\t0. quit\n---> "))
+
+            match choice:
+                case 0:
+                    updateBooks()
+                    self._updateUser()
+                    print("logged out...")
+                    return
+
+                case 1:
+                    self._searchBook()
+
+                case 2:
+                    self._borrowBook()
+
+                case 3:
+                    self._returnBook()
+
+                case _:
+                    print("invalid choice...\n")
 
 while True:
     print("------------------------------")
@@ -239,7 +274,7 @@ while True:
                 print("incorrect password...\n")
                 continue
 
-            client = User(user)
+            client = Client(user)
             client.serveUser()
             exit(0)
             
@@ -251,8 +286,8 @@ while True:
                 print("incorrect password...\n")
                 continue
 
-            client = Librarian(user)
-            client.serveUser()
+            libarian = Librarian(user)
+            libarian.serveUser()
             exit(0)
 
         else:
@@ -277,7 +312,7 @@ while True:
         usersDict["username"] = newUser
 
         #Registered
-        client = User(newUser)
+        client = Client(newUser)
         client.serveUser()
         exit(0)
 
