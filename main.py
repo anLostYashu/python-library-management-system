@@ -157,6 +157,8 @@ class User:
         transaction = transactionsDict.get((bookId, None))
         
         dateFormat = "%Y-%m-%d"
+        # UN/COMMENT THIS FOR THE 3 DAYS MINIMUM TIME LIMIT #
+
         dateToday = datetime.today().strftime(dateFormat)
 
         dateBorrowed = transaction["borrowedDate"]
@@ -189,26 +191,26 @@ class User:
     def serveUser(self):
         while True:
             print("------------------------------")
-            choice = int(input("what would you like to do?\n\t1. search book\n\t2. borrow book\n\t3. return book\n\t0. quit\n---> "))
+            choice = int(input("U: what would you like to do?\n\t1. search book\n\t2. borrow book\n\t3. return book\n\t0. quit\n---> "))
 
-            if choice == 0:
-                updateBooks()
-                self.updateData()
-                print("logged out...")
+            match choice:
+                case 0:
+                    updateBooks()
+                    self.updateData()
+                    print("logged out...")
+                    return
 
-                break
+                case 1:
+                    self.searchBook()
 
-            elif choice == 1:
-                self.searchBook()
-            
-            elif choice == 2:
-                self.borrowBook()
+                case 2:
+                    self.borrowBook()
 
-            elif choice == 3:
-                self.returnBook()
-            
-            else:
-                print("invalid choice...\n")
+                case 3:
+                    self.returnBook()
+
+                case _:
+                    print("invalid choice...\n")
 
 class Librarian(User):
     borrowLimit = 3
