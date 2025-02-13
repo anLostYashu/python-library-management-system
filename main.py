@@ -14,28 +14,26 @@ with open("books.json", "r") as booksJson:
 with open("librarians.json", "r") as librariansJson:
     libs = json.load(librariansJson)
 
+with open("admins.json", "r") as adminsJson:
+    admins = json.load(adminsJson)
+
 
 # convert lists to dictionaries for fast searching
 booksDict = {book["bookId"]: book for book in books}
 usersDict = {user["username"]: user for user in users}
 libsDict = {lib["username"]: lib for lib in libs}
+adminsDict = {admin["username"]: admin for admin in admins}
 
 def updateBooks():
     with open("books.json", "w") as booksJson:
         json.dump(list(booksDict.values()), booksJson, indent=4)
 
 class User(ABC):
-    _borrowLimit = None
-
     def __init__(self, user):
         self.user = user
 
     def __str__(self):
         return f'userId: {self.user["userId"]}, username: {self.user["username"]}, pass: {self.user["password"]}.'
-
-    def _updateUser(self):
-        with open("users.json", "w") as usersJson:
-            json.dump(list(usersDict.values()), usersJson, indent=4)
 
     def _listBooks(self):
         if len(books) == 0:
@@ -128,6 +126,10 @@ class Client(User):
     def __init__(self, user):
         self.user = user
         self._borrowLimit = 1
+
+    def _updateUser(self):
+        with open("users.json", "w") as usersJson:
+            json.dump(list(usersDict.values()), usersJson, indent=4)
 
     def __reserveBook(self):
         bookId = input("enter book ID that you want to reserve: ")
@@ -456,6 +458,125 @@ class Librarian(User):
             except ValueError as error:
                 print("invalid choice...\n")
 
+class Admin(User):
+    def __init__(self, user):
+        self.user = user
+
+    def __addBook(self):
+        bookId = input("enter book ID: ")
+        bookName = input("enter book name: ")
+        bookAuthor = input("enter book author: ")
+        
+        while True: # input handler for availability
+            try:
+                availability = input("book availability (y/n): ")
+
+                if availability in ["no", "n"]:
+                    booksDict[bookId] = {
+                        "bookId": bookId.strip(),
+                        "bookName": bookName.title().strip(),
+                        "bookAuthor": bookAuthor.title().strip(),
+                        "rackNumber": None,
+                        "availability": False,
+                        "bookCount": 0,
+                        "borrowers": []
+                    }
+
+                    print("book added successfully...\n")
+                    return
+                    
+                if availability in ["yes", "y"]:
+                    availability = True
+                    break
+
+            except ValueError:
+                print("invalid choice...\n")
+        
+        while True: #input handler for rack number
+            try:
+                rack = int(input("enter rack number: "))
+
+                if rack < 1 or rack > 20:
+                    print("there are only 20 racks to choose from...\n")
+                    continue
+
+                break
+            except ValueError:
+                print("only integer is allowed as a rack number...\n")
+
+        while True: #input handler for book count
+            try:
+                bookCount = int(input("enter book count: "))
+
+                if bookCount < 1 or bookCount > 30:
+                    print("you can only add maximum of 30 books...\n")
+                    continue
+
+                break
+            
+            except ValueError:
+                print("enter a valid number...\n")
+
+        booksDict[bookId] = {
+            "bookId": bookId.strip(),
+            "bookName": bookName.title().strip(),
+            "bookAuthor": bookAuthor.title().strip(),
+            "rackNumber": rack,
+            "availability": availability,
+            "bookCount": bookCount,
+            "borrowers": []
+        }
+
+        print("book added successfully...\n")
+
+    def __removeBook(self):
+        bookId = input("enter book Id: ")
+
+        if bookId not in booksDict:
+            print(f"there are no books with ID {bookId}")
+            return
+
+        print(f'the book with ID "{bookId}" and name "{booksDict[bookId]["bookName"]}" has been removed...\n')
+        booksDict.pop(bookId)
+
+    def serveUser(self):
+        while True:
+            print("------------------------------")
+            try:
+                choice = int(input("A: what would you like to do?\n\t1. search book\n\t2. list books\n\t3. add book\n\t4. remove book\n\t5. add librarian\n\t6. remove librarian\n\t0. quit\n---> "))
+
+                match choice:
+                    case 0:
+                        updateBooks()
+                        print("logged out...")
+                        return
+
+                    case 1:
+                        self._searchBook()
+
+                    case 2:
+                        self._listBooks()
+
+                    case 3:
+                        self.__addBook()
+
+                    case 4:
+                        self.__removeBook()
+                    
+                    case 5:
+                        self.__addLibrarian()
+
+                    case 6:
+                        self.__removeLibrarian()
+
+                    case _:
+                        print("invalid choice...\n")
+
+            except ValueError as error:
+                print("invalid choice...\n")
+
+
+
 while True:
     print("------------------------------")
     try:
@@ -478,6 +599,8 @@ while True:
 
                     client = Client(user)
                     client.serveUser()
+                    client._updateUser()
+
                     exit(0)
                     
                 elif username in libsDict:
@@ -488,8 +611,21 @@ while True:
                         print("incorrect password...\n")
                         continue
 
-                    libarian = Librarian(user)
-                    libarian.serveUser()
+                    librarian = Librarian(user)
+                    librarian.serveUser()
+                    librarian._updateUser()
+                    exit(0)
+
+                elif username in adminsDict:
+                    user = adminsDict[username]
+                    password = input("enter your password: ")
+
+                    if password != user["password"]:
+                        print("incorrect password...\n")
+                        continue
+
+                    admin = Admin(user)
+                    admin.serveUser()
                     exit(0)
 
                 else:
