@@ -119,7 +119,35 @@ class User(ABC):
 
             except ValueError:
                 print("invalid choice...\n")
-    
+
+    @abstractmethod
+    def serveUser():
+        pass
+
+class Client(User):
+    def __init__(self, user):
+        self.user = user
+        self._borrowLimit = 1
+
+    def __reserveBook(self):
+        bookId = input("enter book ID that you want to reserve: ")
+
+        if bookId not in booksDict:
+            print(f'a book with ID "{bookId}" does not exist, confirm the book ID...\n')
+            return
+        
+        if booksDict[bookId]["availability"]:
+            print(f'the book with ID "{bookId}" and name "{booksDict[bookId]["bookName"]}" is already available...\n')
+            return
+        
+        if bookId in self.user["reservations"]:
+            print(f'you have already reserved the book with ID {bookId} and name "{booksDict[bookId]["bookName"]}"...\n')
+            return
+
+        self.user["reservations"].append(bookId)
+
+        print(f'successfully reserved "{booksDict[bookId]["bookName"]}"...\n')
+
     def _borrowBook(self):
         if self.user["currentlyBorrowedBook"] == self._borrowLimit:
             print(f'you can not borrow more than {self._borrowLimit} book at a time...\nf')
@@ -211,34 +239,6 @@ class User(ABC):
 
         print("Successfully returned", book["bookName"], "by", book["bookAuthor"] + "...\n")
 
-    @abstractmethod
-    def serveUser():
-        pass
-
-class Client(User):
-    def __init__(self, user):
-        self.user = user
-        self._borrowLimit = 1
-
-    def __reserveBook(self):
-        bookId = input("enter book ID that you want to reserve: ")
-
-        if bookId not in booksDict:
-            print(f'a book with ID "{bookId}" does not exist, confirm the book ID...\n')
-            return
-        
-        if booksDict[bookId]["availability"]:
-            print(f'the book with ID "{bookId}" and name "{booksDict[bookId]["bookName"]}" is already available...\n')
-            return
-        
-        if bookId in self.user["reservations"]:
-            print(f'you have already reserved the book with ID {bookId} and name "{booksDict[bookId]["bookName"]}"...\n')
-            return
-
-        self.user["reservations"].append(bookId)
-
-        print(f'successfully reserved "{booksDict[bookId]["bookName"]}"...\n')
-
     def serveUser(self):
         for reservation in self.user["reservations"]:
             if booksDict[reservation]["availability"]:
@@ -285,6 +285,97 @@ class Librarian(User):
     def _updateUser(self):
         with open("librarians.json", "w") as librariansJson:
             json.dump(list(libsDict.values()), librariansJson, indent=4)
+
+    def _borrowBook(self):
+        if self.user["currentlyBorrowedBook"] == self._borrowLimit:
+            print(f'you can not borrow more than {self._borrowLimit} book at a time...\nf')
+            return
+
+        bookId = input("enter book ID of the book you want to borrow: ")
+
+        book = booksDict.get(bookId)
+
+        if not book:
+            print("book not found... check the book ID...\n")
+            return
+
+        if self.user["userId"] in book["borrowers"]:
+            print("you can't borrow the same book twice...\n")
+            return
+        
+        if not book["availability"]:
+            print("book is not available. try another one...\n")
+            return
+        
+        if bookId in self.user["reservations"]:
+            self.user["reservations"].remove(bookId)
+        
+        # EDITING BOOKS OBJECT
+        book["bookCount"] -= 1
+        book["borrowers"].append(self.user["userId"])
+        
+        if book["bookCount"] == 0:
+            book["designatedRackNumber"] = book["rackNumber"]
+            book["rackNumber"] = None
+            book["availability"] = False
+
+        # EDITING USER OBJECT
+        self.user["borrowedBooks"].append({
+            'transactionId': str(uuid.uuid4()),
+            'bookId': book["bookId"],
+            'bookName': book["bookName"],
+            'borrowedDate': datetime.today().strftime("%Y-%m-%d"),
+            'returnedDate': None
+        })
+        self.user["currentlyBorrowedBook"] += 1
+
+        print("Successfully borrowed", book["bookName"], "by", book["bookAuthor"] + "...\n")
+
+    def _returnBook(self):
+        if self.user["currentlyBorrowedBook"] == 0:
+            print("You haven't borrowed any book to return...\n")
+            return
+        
+        bookId = input("enter book ID of the book you want to return: ")
+        transactionsDict = {(transaction["bookId"], transaction["returnedDate"]): transaction for transaction in self.user["borrowedBooks"]}
+
+        if (bookId, None) not in transactionsDict:
+            print("book ID does not match your currently borrowed book(s) ID...\n")
+            return
+        
+        transaction = transactionsDict.get((bookId, None))
+        
+        dateFormat = "%Y-%m-%d"
+        # UN/COMMENT THIS FOR THE 3 DAYS MINIMUM TIME LIMIT #
+
+        # dateToday = datetime.today().strftime(dateFormat)
+
+        # dateBorrowed = transaction["borrowedDate"]
+        # dateDifference = datetime.strptime(dateToday, dateFormat) - datetime.strptime(dateBorrowed, dateFormat)
+
+        # if dateDifference.days <= 3:
+        #     print("You can only return a book after 3 days...\n")
+        #     return
+
+        book = booksDict.get(bookId)
+        if not book:
+            print("ERROR: BOOK NOT FOUND.\n")
+            return
+        
+        # EDITING BOOKS
+        book["bookCount"] += 1
+        book["borrowers"].remove(self.user["userId"])
+
+        if book["bookCount"] == 1:
+            book["rackNumber"] = book["designatedRackNumber"]
+            book.pop("designatedRackNumber")
+            book["availability"] = True
+        
+        # EDITING USERS
+        self.user["currentlyBorrowedBook"] -= 1
+        transaction["returnedDate"] = datetime.today().strftime(dateFormat)
+
+        print("Successfully returned", book["bookName"], "by", book["bookAuthor"] + "...\n")
 
     def __updateBook(self):
         bookId = input("enter the book ID of the book you want to update: ")
@@ -420,7 +511,7 @@ while True:
                     "currentlyBorrowedBook": 0,
                 }
 
-                usersDict["username"] = newUser
+                usersDict[username] = newUser
 
                 #Registered
                 client = Client(newUser)
