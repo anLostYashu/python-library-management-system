@@ -455,7 +455,7 @@ class Librarian(User):
                     case _:
                         print("invalid choice...\n")
 
-            except ValueError as error:
+            except ValueError:
                 print("invalid choice...\n")
 
 class Admin(User):
@@ -464,6 +464,11 @@ class Admin(User):
 
     def __addBook(self):
         bookId = input("enter book ID: ")
+
+        if bookId in booksDict:
+            print(f"book with the ID '{bookId}' already exists.")
+            return
+
         bookName = input("enter book name: ")
         bookAuthor = input("enter book author: ")
         
@@ -564,15 +569,15 @@ class Admin(User):
                         self.__removeBook()
                     
                     case 5:
-                        self.__addLibrarian()
+                        self.__addLibrarian() # pending
 
                     case 6:
-                        self.__removeLibrarian()
+                        self.__removeLibrarian() # pending
 
                     case _:
                         print("invalid choice...\n")
 
-            except ValueError as error:
+            except ValueError:
                 print("invalid choice...\n")
 
 
@@ -644,6 +649,7 @@ while True:
                     "username": username,
                     "password": password,
                     "borrowedBooks": [],
+                    "reservations": [],
                     "currentlyBorrowedBook": 0,
                 }
 
