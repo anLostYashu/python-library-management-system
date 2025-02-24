@@ -544,6 +544,43 @@ class Admin(User):
         print(f'the book with ID "{bookId}" and name "{booksDict[bookId]["bookName"]}" has been removed...\n')
         booksDict.pop(bookId)
 
+    def __addLibrarian(self):
+        username = input("enter librarian's username: ")
+
+        if username in libsDict:
+            print(f"librarian with username '{username}' already exists.")
+            return
+        
+        password = input("enter libarian password: ")
+        
+        libsDict[username] = {
+            "userId": str(uuid.uuid4()),
+            "username": username,
+            "password": password,
+            "borrowedBooks": [],
+            "currentlyBorrowedBook": 0 
+        }
+
+        print(f"successfully added librarian with username '{username}'.")
+        with open("librarians.json", "w") as librariansJson:
+            json.dump(list(libsDict.values()), librariansJson, indent=4)
+
+    def __removeLibrarian(self):
+        username = input("enter librarian's username: ")
+
+        if username not in libsDict:
+            print(f"librarian with username '{username}' does not exists.")
+            return
+
+        if libsDict.pop(username):
+            print(f"successfully removed librarian with username '{username}'.")
+            with open("librarians.json", "w") as librariansJson:
+                json.dump(list(libsDict.values()), librariansJson, indent=4)
+            return
+
+        print(f"error occured while removing librarian with username '{username}'.")
+
+
     def serveUser(self):
         while True:
             print("------------------------------")
