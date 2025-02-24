@@ -1,0 +1,9 @@
+[
+    {
+        "userId": "40f6ee93-30fc-4095-8a51-14469241831c",
+        "username": "lib",
+        "password": "abc",
+        "borrowedBooks": [],
+        "currentlyBorrowedBook": 0
+    }
+]
